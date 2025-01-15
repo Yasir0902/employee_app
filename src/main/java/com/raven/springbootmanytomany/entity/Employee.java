@@ -1,18 +1,10 @@
 package com.raven.springbootmanytomany.entity;
 
-import java.util.Set;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 
-import javax.persistence.CascadeType;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.FetchType;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.JoinColumn;
-import javax.persistence.JoinTable;
-import javax.persistence.ManyToMany;
-import javax.persistence.Table;
+import javax.persistence.*;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "EMPLOYEE")
@@ -23,19 +15,25 @@ public class Employee {
     @Column(name = "ID")
     private int id;
 
-    @Column(name = "name")
+    @Column(name = "name", nullable = false)
     private String name;
 
-    @Column(name = "email")
+    @Column(name = "email", nullable = false, unique = true)
     private String email;
 
-    @Column(name = "technicalSkill")
+    @Column(name = "technicalSkill", nullable = false)
     private String technicalSkill;
 
-    @ManyToMany(fetch = FetchType.LAZY, cascade = { CascadeType.PERSIST, CascadeType.MERGE, CascadeType.DETACH,
-            CascadeType.REFRESH })
-    @JoinTable(name = "EMPLOYEE_PROJECT_MAPPING", joinColumns = @JoinColumn(name = "employee_id"), inverseJoinColumns = @JoinColumn(name = "project_id"))
-    private Set<Project> projects;
+    @ManyToMany(fetch = FetchType.LAZY, cascade = {
+            CascadeType.PERSIST, CascadeType.MERGE,
+            CascadeType.DETACH, CascadeType.REFRESH
+    })
+    @JoinTable(
+            name = "EMPLOYEE_PROJECT_MAPPING",
+            joinColumns = @JoinColumn(name = "employee_id"),
+            inverseJoinColumns = @JoinColumn(name = "project_id")
+    )
+    private Set<Project> projects = new HashSet<>();
 
     public Employee() {
     }
@@ -48,10 +46,6 @@ public class Employee {
 
     public int getId() {
         return id;
-    }
-
-    public void setId(int id) {
-        this.id = id;
     }
 
     public String getName() {
@@ -88,7 +82,7 @@ public class Employee {
 
     @Override
     public String toString() {
-        return "Employee [email=" + email + ", id=" + id + ", name=" + name + ", technicalSkill=" + technicalSkill
-                + "]";
+        return "Employee [id=" + id + ", name=" + name + ", email=" + email
+                + ", technicalSkill=" + technicalSkill + "]";
     }
 }

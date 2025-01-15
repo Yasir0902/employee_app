@@ -1,18 +1,11 @@
 package com.raven.springbootmanytomany.entity;
 
-import java.util.Set;
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
-import javax.persistence.CascadeType;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.FetchType;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.JoinColumn;
-import javax.persistence.JoinTable;
-import javax.persistence.ManyToMany;
-import javax.persistence.Table;
+import javax.persistence.*;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "PROJECT")
@@ -23,16 +16,18 @@ public class Project {
     @Column(name = "ID")
     private int id;
 
-    @Column(name = "projectName")
+    @Column(name = "projectName", nullable = false)
     private String projectName;
 
-    @Column(name = "technologyUsed")
+    @Column(name = "technologyUsed", nullable = false)
     private String technologyUsed;
 
-    @ManyToMany(fetch = FetchType.LAZY, cascade = { CascadeType.PERSIST, CascadeType.MERGE, CascadeType.DETACH,
-            CascadeType.REFRESH })
-    @JoinTable(name = "EMPLOYEE_PROJECT_MAPPING", joinColumns = @JoinColumn(name = "project_id"), inverseJoinColumns = @JoinColumn(name = "employee_id"))
-    private Set<Employee> employees;
+    @ManyToMany(mappedBy = "projects", fetch = FetchType.LAZY, cascade = {
+            CascadeType.PERSIST, CascadeType.MERGE,
+            CascadeType.DETACH, CascadeType.REFRESH
+    })
+    @JsonIgnore
+    private Set<Employee> employees = new HashSet<>();
 
     public Project() {
     }
@@ -44,10 +39,6 @@ public class Project {
 
     public int getId() {
         return id;
-    }
-
-    public void setId(int id) {
-        this.id = id;
     }
 
     public String getProjectName() {
