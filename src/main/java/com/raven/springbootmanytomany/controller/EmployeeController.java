@@ -1,121 +1,144 @@
 package com.raven.springbootmanytomany.controller;
 
-import java.util.HashSet;
-import java.util.Set;
-
 import com.raven.springbootmanytomany.entity.Employee;
 import com.raven.springbootmanytomany.entity.Project;
 import com.raven.springbootmanytomany.repository.EmployeeRepository;
 import com.raven.springbootmanytomany.repository.ProjectRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/employee")
 public class EmployeeController {
+
+    private static final Logger logger = LoggerFactory.getLogger(EmployeeController.class);
+
     @Autowired
     private EmployeeRepository employeeRepository;
 
     @Autowired
     private ProjectRepository projectRepository;
 
-    @PostMapping(value = "/createEmployee")
-    public String createEmployee(@RequestBody Employee entity) {
-        System.out.println("Create a new Employee." + "\n");
+    @PostMapping("/createEmployee")
+    public ResponseEntity<String> createEmployee(@RequestBody Employee employee) {
+        logger.info("Creating a new Employee: {}", employee.getName());
 
-        // create a new Employee
-        Employee employee = new Employee(entity.getName(), entity.getEmail(), entity.getTechnicalSkill());
+        employeeRepository.save(employee);
+        logger.info("Saved Employee: {}", employee.toString());
 
-        // save Employee
-        employee = employeeRepository.save(employee);
-        System.out.println("Saved employee :: " + employee + "\n");
-
-        return "Employee saved!!!";
+        return new ResponseEntity<>("Employee created successfully!", HttpStatus.CREATED);
     }
 
-    @PostMapping(value = "/createEmployeeForProject/{projId}")
-    public String createEmployeeForProject(@RequestBody Employee entity,
-            @PathVariable(name = "projId") String projId) {
-        System.out.println("\nCreate a new Employee and assign to an existing Project." + "\n");
+    @PostMapping("/createEmployeeAndAssignProjects")
+    public ResponseEntity<String> createEmployeeAndAssignProjects(@RequestBody CreateEmployeeWithProjectsRequest request) {
+        logger.info("Creating a new Employee and assigning Projects: {}", request.getName());
 
-        // create a new Employee
-        Employee employee = new Employee(entity.getName(), entity.getEmail(), entity.getTechnicalSkill());
+        Employee employee = new Employee(request.getName(), request.getEmail(), request.getTechnicalSkill());
 
-        // save Employee
-        employee = employeeRepository.save(employee);
-        System.out.println("\nSaved employee :: " + employee + "\n");
+        List<Project> projects = projectRepository.findAllById(request.getProjectIds());
+        if (projects.isEmpty()) {
+            logger.warn("No valid Projects found for assignment.");
+            return new ResponseEntity<>("No valid Projects found to assign.", HttpStatus.BAD_REQUEST);
+        }
 
-        // get a Project
-        Project project = this.projectRepository.getById(Integer.valueOf(projId));
-        System.out.println("\nProject details :: " + project.toString() + "\n");
+        employee.getProjects().addAll(projects);
 
-        // create Employee set
-        Set<Employee> employees = new HashSet<>();
-        employees.add(employee);
+        for (Project project : projects) {
+            project.getEmployees().add(employee);
+        }
 
-        // assign Employee Set to Project
-        project.setEmployees(employees);
+        employeeRepository.save(employee);
+        logger.info("Employee created with assigned projects: {}", employee.toString());
 
-        // save Project
-        project = projectRepository.save(project);
-
-        System.out.println("\nEmployee assigned to the Project." + "\n");
-
-        return "Employee saved!!!";
+        return new ResponseEntity<>("Employee created and Projects assigned successfully!", HttpStatus.CREATED);
     }
 
-    @PostMapping(value = "/assignEmployeeToProject/{projId}")
-    public String assignEmployeeToProject(@PathVariable(name = "projId") Integer projId) {
-        System.out.println("\nFetch existing Employee details and assign them to an existing Project." + "\n");
+    @PostMapping("/assignProjectToEmployee/{employeeId}")
+    public ResponseEntity<String> assignProjectToEmployee(
+            @PathVariable Integer employeeId,
+            @RequestBody Integer projectId) {
+        logger.info("Assigning Project ID {} to Employee ID {}", projectId, employeeId);
 
-        // get first Employee
-        int emplId = 1;
-        Employee employee1 = this.employeeRepository.getById(emplId);
-        System.out.println("\nEmployee details :: " + employee1.toString() + "\n");
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid Employee ID: " + employeeId));
+        logger.debug("Employee details: {}", employee.toString());
 
-        // get first Employee
-        emplId = 8;
-        Employee employee2 = this.employeeRepository.getById(emplId);
-        System.out.println("\nEmployee details :: " + employee2.toString() + "\n");
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid Project ID: " + projectId));
+        logger.debug("Project details: {}", project.toString());
 
-        // get a Project
-        Project project = this.projectRepository.getById(projId);
-        System.out.println("\nProject details :: " + project.toString() + "\n");
+        if (!employee.getProjects().contains(project)) {
+            employee.getProjects().add(project);
+            project.getEmployees().add(employee);
 
-        // create Employee set
-        Set<Employee> employees = new HashSet<>();
-        employees.add(employee1);
-        employees.add(employee2);
+            employeeRepository.save(employee);
+            logger.info("Project ID {} assigned to Employee ID {}", projectId, employeeId);
 
-        // assign Employee Set to Project
-        project.setEmployees(employees);
-
-        // save Project
-        project = projectRepository.save(project);
-
-        System.out.println("Employees assigned to the Project." + "\n");
-
-        return "Employee saved!!!";
+            return new ResponseEntity<>("Project assigned to Employee successfully!", HttpStatus.OK);
+        } else {
+            logger.warn("Employee ID {} is already assigned to Project ID {}", employeeId, projectId);
+            return new ResponseEntity<>("Employee is already assigned to this Project.", HttpStatus.CONFLICT);
+        }
     }
 
-    @GetMapping(value = "/getEmployee/{empId}")
-    public String getEmployee(@PathVariable(name = "empId") Integer empId) {
-        System.out.println("\nFetch Employee and Project details.");
+    @GetMapping("/getEmployee/{employeeId}")
+    public ResponseEntity<Employee> getEmployee(@PathVariable Integer employeeId) {
+        logger.info("Fetching Employee with ID: {}", employeeId);
 
-        // get Employee details
-        Employee employee = this.employeeRepository.getById(empId);
-        System.out.println("\nEmployee details :: " + employee.toString() + "\n");
-        System.out.println("\nProject details :: " + employee.getProjects() + "\n");
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid Employee ID: " + employeeId));
+        logger.debug("Employee details: {}", employee.toString());
 
-        System.out.println("Done!!!\n");
-
-        return "Employee fetched successfully!!!";
+        return new ResponseEntity<>(employee, HttpStatus.OK);
     }
 
+    public static class CreateEmployeeWithProjectsRequest {
+        private String name;
+        private String email;
+        private String technicalSkill;
+        private List<Integer> projectIds;
+
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getEmail() {
+            return email;
+        }
+
+        public void setEmail(String email) {
+            this.email = email;
+        }
+
+        public String getTechnicalSkill() {
+            return technicalSkill;
+        }
+
+        public void setTechnicalSkill(String technicalSkill) {
+            this.technicalSkill = technicalSkill;
+        }
+
+        public List<Integer> getProjectIds() {
+            return projectIds;
+        }
+
+        public void setProjectIds(List<Integer> projectIds) {
+            this.projectIds = projectIds;
+        }
+    }
 }
