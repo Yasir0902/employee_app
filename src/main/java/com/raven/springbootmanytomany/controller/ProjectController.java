@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/api/project")
+@CrossOrigin(origins = "http://localhost:4200")
 public class ProjectController {
 
     private static final Logger logger = LoggerFactory.getLogger(ProjectController.class);
